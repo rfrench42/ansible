@@ -407,6 +407,7 @@ def main():
         module.fail_json_aws(e, msg="Trying to connect to AWS")
 
 
+
     if re.match('^arn:aws(-([a-z\-]+))?:iam', role):
         role_arn = role
     else:
