@@ -13,17 +13,17 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 DOCUMENTATION = r'''
 ---
 module: aci_l3out_route_tag_policy
-short_description: Manage route tag policies on Cisco ACI fabrics (l3ext:RouteTagPol)
+short_description: Manage route tag policies (l3ext:RouteTagPol)
 description:
 - Manage route tag policies on Cisco ACI fabrics.
-- More information from the internal APIC class I(l3ext:RouteTagPol) at
-  U(https://developer.cisco.com/docs/apic-mim-ref/).
-author:
-- Dag Wieers (@dagwieers)
-version_added: '2.4'
 notes:
 - The C(tenant) used must exist before using this module in your playbook.
   The M(aci_tenant) module can be used for this.
+- More information about the internal APIC class B(l3ext:RouteTagPol) from
+  L(the APIC Management Information Model reference,https://developer.cisco.com/docs/apic-mim-ref/).
+author:
+- Dag Wieers (@dagwieers)
+version_added: '2.4'
 options:
   rtp:
     description:
@@ -219,7 +219,6 @@ def main():
     aci.get_existing()
 
     if state == 'present':
-        # Filter out module parameters with null values
         aci.payload(
             aci_class='l3extRouteTagPol',
             class_config=dict(
@@ -228,10 +227,8 @@ def main():
             ),
         )
 
-        # Generate config diff which will be used as POST request body
         aci.get_diff(aci_class='l3extRouteTagPol')
 
-        # Submit changes if module not in check_mode and the proposed is different than existing
         aci.post_config()
 
     elif state == 'absent':

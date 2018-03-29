@@ -13,20 +13,20 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 DOCUMENTATION = r'''
 ---
 module: aci_config_snapshot
-short_description: Manage Config Snapshots on Cisco ACI fabrics (config:Snapshot, config:ExportP)
+short_description: Manage Config Snapshots (config:Snapshot, config:ExportP)
 description:
 - Manage Config Snapshots on Cisco ACI fabrics.
 - Creating new Snapshots is done using the configExportP class.
 - Removing Snapshots is done using the configSnapshot class.
-- More information from the internal APIC classes I(config:Snapshot) and I(config:ExportP) at
-  U(https://developer.cisco.com/docs/apic-mim-ref/).
-author:
-- Jacob McGill (@jmcgill298)
-version_added: '2.4'
 notes:
 - The APIC does not provide a mechanism for naming the snapshots.
 - 'Snapshot files use the following naming structure: ce_<config export policy name>-<yyyy>-<mm>-<dd>T<hh>:<mm>:<ss>.<mss>+<hh>:<mm>.'
 - 'Snapshot objects use the following naming structure: run-<yyyy>-<mm>-<dd>T<hh>-<mm>-<ss>.'
+- More information about the internal APIC classes B(config:Snapshot) and B(config:ExportP) from
+  L(the APIC Management Information Model reference,https://developer.cisco.com/docs/apic-mim-ref/).
+author:
+- Jacob McGill (@jmcgill298)
+version_added: '2.4'
 options:
   description:
     description:
@@ -215,7 +215,7 @@ def main():
     argument_spec = aci_argument_spec()
     argument_spec.update(
         description=dict(type='str', aliases=['descr']),
-        export_policy=dict(type='str', aliases=['name']),
+        export_policy=dict(type='str', aliases=['name']),  # Not required for querying all objects
         format=dict(type='str', choices=['json', 'xml']),
         include_secure=dict(type='bool'),
         max_count=dict(type='int'),
@@ -261,7 +261,6 @@ def main():
 
         aci.get_existing()
 
-        # Filter out module params with null values
         aci.payload(
             aci_class='configExportP',
             class_config=dict(

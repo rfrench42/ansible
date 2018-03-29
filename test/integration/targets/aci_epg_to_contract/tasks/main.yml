@@ -1,5 +1,5 @@
 # Test code for the ACI modules
-# Copyright 2017, Jacob McGill <jmcgill298
+# Copyright: (c) 2017, Jacob McGill (@jmcgill298)
 
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -142,10 +142,10 @@
   assert:
     that:
       - query_provide_contract.changed == false
-      - query_provide_contract.previous != []
+      - query_provide_contract.current != []
       - '"class/fvRsProv.json" in query_provide_contract.url'
       - query_consume_contract.changed == false
-      - query_consume_contract.previous != []
+      - query_consume_contract.current != []
       - '"class/fvRsCons.json" in query_consume_contract.url'
       - query_all.changed == false
       - '"class/fvRsProv.json" in query_all.url'
@@ -176,7 +176,7 @@
     state: absent
   register: provide_absent2
 
-- name: delte consume binding - idempotency works
+- name: delete consume binding - idempotency works
   aci_epg_to_contract:
     <<: *aci_epg_consume_absent
   register: consume_absent_idempotent

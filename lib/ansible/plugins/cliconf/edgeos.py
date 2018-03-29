@@ -1,4 +1,4 @@
-# Copyright: (c) 2017, Ansible Project
+# Copyright: (c) 2018, Ansible Project
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -38,7 +38,7 @@ class Cliconf(CliconfBase):
 
         return device_info
 
-    def get_config(self):
+    def get_config(self, source='running', format='text'):
         return self.send_command(b'show configuration commands')
 
     def edit_config(self, command):

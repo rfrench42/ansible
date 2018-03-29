@@ -13,11 +13,12 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 DOCUMENTATION = r'''
 ---
 module: aci_interface_policy_port_channel
-short_description: Manage port channel interface policies on Cisco ACI fabrics (lacp:LagPol)
+short_description: Manage port channel interface policies (lacp:LagPol)
 description:
 - Manage port channel interface policies on Cisco ACI fabrics.
-- More information from the internal APIC class I(lacp:LagPol) at
-  U(https://developer.cisco.com/docs/apic-mim-ref/).
+notes:
+- More information about the internal APIC class B(lacp:LagPol) from
+  L(the APIC Management Information Model reference,https://developer.cisco.com/docs/apic-mim-ref/).
 author:
 - Dag Wieers (@dagwieers)
 version_added: '2.4'
@@ -25,7 +26,7 @@ options:
   port_channel:
     description:
     - Name of the port channel.
-    required: true
+    required: yes
     aliases: [ name ]
   description:
     description:
@@ -48,48 +49,48 @@ options:
     - Port channel interface policy mode.
     - Determines the LACP method to use for forming port-channels.
     - The APIC defaults new Port Channel Polices to C(off).
-    choices: [ active, mac-pin, mac-pin-nicload, off, passive ]
-    default: off
+    choices: [ active, mac-pin, mac-pin-nicload, 'off', passive ]
+    default: 'off'
   fast_select:
     description:
     - Determines if Fast Select is enabled for Hot Standby Ports.
     - This makes up the LACP Policy Control Policy; if one setting is defined, then all other Control Properties
       left undefined or set to false will not exist after the task is ran.
-    - The APIC defaults new LACP Policies to C(true).
+    - The APIC defaults new LACP Policies to C(yes).
     type: bool
-    default: true
+    default: 'yes'
   graceful_convergence:
     description:
     - Determines if Graceful Convergence is enabled.
     - This makes up the LACP Policy Control Policy; if one setting is defined, then all other Control Properties
       left undefined or set to false will not exist after the task is ran.
-    - The APIC defaults new LACP Policies to C(true).
+    - The APIC defaults new LACP Policies to C(yes).
     type: bool
-    default: true
+    default: 'yes'
   load_defer:
     description:
     - Determines if Load Defer is enabled.
     - This makes up the LACP Policy Control Policy; if one setting is defined, then all other Control Properties
       left undefined or set to false will not exist after the task is ran.
-    - The APIC defaults new LACP Policies to C(false).
+    - The APIC defaults new LACP Policies to C(no).
     type: bool
-    default: false
+    default: 'no'
   suspend_individual:
     description:
     - Determines if Suspend Individual is enabled.
     - This makes up the LACP Policy Control Policy; if one setting is defined, then all other Control Properties
       left undefined or set to false will not exist after the task is ran.
-    - The APIC defaults new LACP Policies to C(true).
+    - The APIC defaults new LACP Policies to C(yes).
     type: bool
-    default: true
+    default: 'yes'
   symmetric_hash:
     description:
     - Determines if Symmetric Hashing is enabled.
     - This makes up the LACP Policy Control Policy; if one setting is defined, then all other Control Properties
       left undefined or set to false will not exist after the task is ran.
-    - The APIC defaults new LACP Policies to C(false).
+    - The APIC defaults new LACP Policies to C(no).
     type: bool
-    default: false
+    default: 'no'
   state:
     description:
     - Use C(present) or C(absent) for adding or removing.
@@ -288,7 +289,6 @@ def main():
     aci.get_existing()
 
     if state == 'present':
-        # Filter out module parameters with null values
         aci.payload(
             aci_class='lacpLagPol',
             class_config=dict(
@@ -301,10 +301,8 @@ def main():
             ),
         )
 
-        # Generate config diff which will be used as POST request body
         aci.get_diff(aci_class='lacpLagPol')
 
-        # Submit changes if module not in check_mode and the proposed is different than existing
         aci.post_config()
 
     elif state == 'absent':

@@ -13,18 +13,18 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 DOCUMENTATION = r'''
 ---
 module: aci_vrf
-short_description: Manage VRF (private networks aka. contexts) on Cisco ACI fabrics (fv:Ctx)
+short_description: Manage contexts or VRFs (fv:Ctx)
 description:
-- Manage VRF (private networks aka. contexts) on Cisco ACI fabrics.
+- Manage contexts or VRFs on Cisco ACI fabrics.
 - Each context is a private network associated to a tenant, i.e. VRF.
-- More information from the internal APIC class I(fv:Ctx) at
-  U(https://developer.cisco.com/docs/apic-mim-ref/).
-author:
-- Jacob McGill (@jmcgill298)
-version_added: '2.4'
 notes:
 - The C(tenant) used must exist before using this module in your playbook.
   The M(aci_tenant) module can be used for this.
+- More information about the internal APIC class B(fv:Ctx) from
+  L(the APIC Management Information Model reference,https://developer.cisco.com/docs/apic-mim-ref/).
+author:
+- Jacob McGill (@jmcgill298)
+version_added: '2.4'
 options:
   tenant:
     description:
@@ -247,10 +247,10 @@ def main():
             module_object=vrf,
         ),
     )
+
     aci.get_existing()
 
     if state == 'present':
-        # Filter out module params with null values
         aci.payload(
             aci_class='fvCtx',
             class_config=dict(
@@ -261,10 +261,8 @@ def main():
             ),
         )
 
-        # Generate config diff which will be used as POST request body
         aci.get_diff(aci_class='fvCtx')
 
-        # Submit changes if module not in check_mode and the proposed is different than existing
         aci.post_config()
 
     elif state == 'absent':

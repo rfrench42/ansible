@@ -46,17 +46,20 @@ options:
     - If set to C(True), the DRS rule will be enabled.
     - Effective only if C(state) is set to C(present).
     default: False
+    type: bool
   mandatory:
     description:
     - If set to C(True), the DRS rule will be mandatory.
     - Effective only if C(state) is set to C(present).
     default: False
+    type: bool
   affinity_rule:
     description:
     - If set to C(True), the DRS rule will be an Affinity rule.
     - If set to C(False), the DRS rule will be an Anti-Affinity rule.
     - Effective only if C(state) is set to C(present).
-    default: False
+    default: True
+    type: bool
   state:
     description:
     - If set to C(present), then the DRS rule is created if not present.
@@ -64,6 +67,7 @@ options:
     - If set to C(absent), then the DRS rule is deleted if present.
     required: False
     default: present
+    choices: [ present, absent ]
 extends_documentation_fragment: vmware.documentation
 '''
 
@@ -228,7 +232,7 @@ class VmwareDrs(PyVmomi):
     # Create
     def create(self):
         """
-        Function to create a DRS rule if rule does not exists
+        Function to create a DRS rule if rule does not exist
         """
         rule_obj = self.get_rule_key_by_name(rule_name=self.rule_name)
         if rule_obj is not None:

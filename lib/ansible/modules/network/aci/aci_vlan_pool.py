@@ -15,11 +15,12 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 DOCUMENTATION = r'''
 ---
 module: aci_vlan_pool
-short_description: Manage VLAN pools on Cisco ACI fabrics (fvns:VlanInstP)
+short_description: Manage VLAN pools (fvns:VlanInstP)
 description:
 - Manage VLAN pools on Cisco ACI fabrics.
-- More information from the internal APIC class I(fvns:VlanInstP) at
-  U(https://developer.cisco.com/docs/apic-mim-ref/).
+notes:
+- More information about the internal APIC class B(fvns:VlanInstP) from
+  L(the APIC Management Information Model reference,https://developer.cisco.com/docs/apic-mim-ref/).
 author:
 - Jacob McGill (@jmcgill298)
 - Dag Wieers (@dagwieers)
@@ -197,7 +198,7 @@ def main():
     argument_spec = aci_argument_spec()
     argument_spec.update(
         description=dict(type='str', aliases=['descr']),
-        pool=dict(type='str', aliases=['name', 'pool_name']),
+        pool=dict(type='str', aliases=['name', 'pool_name']),  # Not required for querying all objects
         pool_allocation_mode=dict(type='str', aliases=['allocation_mode', 'mode'], choices=['dynamic', 'static']),
         state=dict(type='str', default='present', choices=['absent', 'present', 'query']),
     )
@@ -238,20 +239,17 @@ def main():
     aci.get_existing()
 
     if state == 'present':
-        # Filter out module parameters with null values
         aci.payload(
             aci_class='fvnsVlanInstP',
             class_config=dict(
                 allocMode=pool_allocation_mode,
                 descr=description,
                 name=pool,
-            )
+            ),
         )
 
-        # Generate config diff which will be used as POST request body
         aci.get_diff(aci_class='fvnsVlanInstP')
 
-        # Submit changes if module not in check_mode and the proposed is different than existing
         aci.post_config()
 
     elif state == 'absent':

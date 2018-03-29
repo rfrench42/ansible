@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+# Copyright: (c) 2018, Dag Wieers (dagwieers) <dag@wieers.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -13,17 +14,17 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 DOCUMENTATION = r'''
 ---
 module: aci_taboo_contract
-short_description: Manage taboo contracts on Cisco ACI fabrics (vz:BrCP)
+short_description: Manage taboo contracts (vz:BrCP)
 description:
 - Manage taboo contracts on Cisco ACI fabrics.
-- More information from the internal APIC class I(vz:BrCP) at
-  U(https://developer.cisco.com/docs/apic-mim-ref/).
-author:
-- Dag Wieers (@dagwieers)
-version_added: '2.4'
 notes:
 - The C(tenant) used must exist before using this module in your playbook.
   The M(aci_tenant) module can be used for this.
+- More information about the internal APIC class B(vz:BrCP) from
+  L(the APIC Management Information Model reference,https://developer.cisco.com/docs/apic-mim-ref/).
+author:
+- Dag Wieers (@dagwieers)
+version_added: '2.4'
 options:
   taboo_contract:
     description:
@@ -54,15 +55,40 @@ options:
 extends_documentation_fragment: aci
 '''
 
-# FIXME: Add more, better examples
 EXAMPLES = r'''
-- aci_taboo_contract:
-    host: '{{ inventory_hostname }}'
-    username: '{{ username }}'
-    password: '{{ password }}'
-    taboo_contract: '{{ taboo_contract }}'
-    description: '{{ descr }}'
-    tenant: '{{ tenant }}'
+- name: Add taboo contract
+  aci_taboo_contract:
+    host: apic
+    username: admin
+    password: SomeSecretPassword
+    tenant: ansible_test
+    taboo_contract: taboo_contract_test
+    state: present
+
+- name: Remove taboo contract
+  aci_taboo_contract:
+    host: apic
+    username: admin
+    password: SomeSecretPassword
+    tenant: ansible_test
+    taboo_contract: taboo_contract_test
+    state: absent
+
+- name: Query all taboo contracts
+  aci_taboo_contract:
+    host: apic
+    username: admin
+    password: SomeSecretPassword
+    state: query
+
+- name: Query a specific taboo contract
+  aci_taboo_contract:
+    host: apic
+    username: admin
+    password: SomeSecretPassword
+    tenant: ansible_test
+    taboo_contract: taboo_contract_test
+    state: query
 '''
 
 RETURN = r'''
@@ -220,19 +246,17 @@ def main():
     aci.get_existing()
 
     if state == 'present':
-        # Filter out module parameters with null values
         aci.payload(
             aci_class='vzTaboo',
             class_config=dict(
                 name=taboo_contract,
-                descr=description, scope=scope,
+                descr=description,
+                scope=scope,
             ),
         )
 
-        # Generate config diff which will be used as POST request body
         aci.get_diff(aci_class='vzTaboo')
 
-        # Submit changes if module not in check_mode and the proposed is different than existing
         aci.post_config()
 
     elif state == 'absent':

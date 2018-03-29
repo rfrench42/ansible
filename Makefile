@@ -33,9 +33,13 @@ GENERATE_CLI = docs/bin/generate_man.py
 PYTHON=python
 SITELIB = $(shell $(PYTHON) -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")
 
-# VERSION file provides one place to update the software version
-VERSION := $(shell cat VERSION | cut -f1 -d' ')
-RELEASE := $(shell cat VERSION | cut -f2 -d' ')
+# fetch version from project release.py as single source-of-truth
+VERSION := $(shell $(PYTHON) packaging/release/versionhelper/version_helper.py --raw || echo error)
+ifeq ($(findstring error,$(VERSION)), error)
+$(error "version_helper failed")
+endif
+# if a specific release was not requested, set to 0 (RPMs have "fancier" logic for this further down)
+RELEASE ?= 1
 
 # Get the branch information from git
 ifneq ($(shell which git),)
@@ -61,8 +65,9 @@ DEBUILD_OPTS = --source-option="-I"
 DPUT_BIN ?= dput
 DPUT_OPTS ?=
 DEB_DATE := $(shell LC_TIME=C date +"%a, %d %b %Y %T %z")
+DEB_VERSION := $(shell $(PYTHON) packaging/release/versionhelper/version_helper.py --debversion)
 ifeq ($(OFFICIAL),yes)
-    DEB_RELEASE = $(RELEASE)ppa
+    DEB_RELEASE := $(shell $(PYTHON) packaging/release/versionhelper/version_helper.py --debrelease)ppa
     # Sign OFFICIAL builds using 'DEBSIGN_KEYID'
     # DEBSIGN_KEYID is required when signing
     ifneq ($(DEBSIGN_KEYID),)
@@ -89,7 +94,7 @@ PBUILDER_OPTS ?= --debootstrapopts --variant=buildd --architecture $(PBUILDER_AR
 RPMSPECDIR= packaging/rpm
 RPMSPEC = $(RPMSPECDIR)/ansible.spec
 RPMDIST = $(shell rpm --eval '%{?dist}')
-RPMRELEASE = $(RELEASE)
+
 ifneq ($(OFFICIAL),yes)
     RPMRELEASE = 100.git$(DATE)$(GITINFO)
 endif
@@ -97,7 +102,10 @@ ifeq ($(PUBLISH),nightly)
     # https://fedoraproject.org/wiki/Packaging:Versioning#Snapshots
     RPMRELEASE = $(RELEASE).$(DATE)git.$(GIT_HASH)
 endif
-RPMNVR = "$(NAME)-$(VERSION)-$(RPMRELEASE)$(RPMDIST)"
+
+RPMVERSION ?= $(shell $(PYTHON) packaging/release/versionhelper/version_helper.py --baseversion)
+RPMRELEASE ?= $(shell $(PYTHON) packaging/release/versionhelper/version_helper.py --rpmrelease)
+RPMNVR = "$(NAME)-$(RPMVERSION)-$(RPMRELEASE)$(RPMDIST)$(REPOTAG)"
 
 # MOCK build parameters
 MOCK_BIN ?= mock
@@ -145,9 +153,9 @@ authors:
 %.1.asciidoc: %.1.asciidoc.in
 	sed "s/%VERSION%/$(VERSION)/" $< > $@
 
-# Regenerate %.1 if %.1.asciidoc or VERSION has been modified more
+# Regenerate %.1 if %.1.asciidoc or release.py has been modified more
 # recently than %.1. (Implicitly runs the %.1.asciidoc recipe)
-%.1: %.1.asciidoc VERSION
+%.1: %.1.asciidoc lib/ansible/release.py
 	$(ASCII2MAN)
 
 .PHONY: loc
@@ -213,22 +221,35 @@ install_manpages:
 	cp $(wildcard ./docs/man/man1/ansible*.1.gz) $(PREFIX)/man/man1/
 
 .PHONY: sdist
-sdist: clean docs
+sdist: clean docs changelog_aggregate
 	$(PYTHON) setup.py sdist
 
 .PHONY: sdist_upload
 sdist_upload: clean docs
 	$(PYTHON) setup.py sdist upload 2>&1 |tee upload.log
 
+# TODO: variable-ize major version number usages here
+.PHONY: changelog_reno
+changelog_reno:
+	reno -d changelogs/ report --title 'Ansible 2.5 "Kashmir" Release Notes' --collapse-pre-release --no-show-source --earliest-version v2.5.0b1 --output changelogs/CHANGELOG-v2.5.rst
+
+.PHONY: changelog_aggregate
+changelog_aggregate:
+	echo "TODO: unified changelog" > changelogs/CHANGELOG.rst
+
 .PHONY: rpmcommon
 rpmcommon: sdist
 	@mkdir -p rpm-build
 	@cp dist/*.gz rpm-build/
-	@sed -e 's#^Version:.*#Version: $(VERSION)#' -e 's#^Release:.*#Release: $(RPMRELEASE)%{?dist}$(REPOTAG)#' $(RPMSPEC) >rpm-build/$(NAME).spec
+	@cp $(RPMSPEC) rpm-build/$(NAME).spec
 
 .PHONY: mock-srpm
 mock-srpm: /etc/mock/$(MOCK_CFG).cfg rpmcommon
-	$(MOCK_BIN) -r $(MOCK_CFG) $(MOCK_ARGS) --resultdir rpm-build/  --buildsrpm --spec rpm-build/$(NAME).spec --sources rpm-build/
+	$(MOCK_BIN) -r $(MOCK_CFG) $(MOCK_ARGS) --resultdir rpm-build/ --bootstrap-chroot --old-chroot --buildsrpm --spec rpm-build/$(NAME).spec --sources rpm-build/ \
+    --define "rpmversion $(RPMVERSION)" \
+	--define "upstream_version $(VERSION)" \
+	--define "rpmrelease $(RPMRELEASE)" \
+	--define "repotag $(REPOTAG)"
 	@echo "#############################################"
 	@echo "Ansible SRPM is built:"
 	@echo rpm-build/*.src.rpm
@@ -236,7 +257,11 @@ mock-srpm: /etc/mock/$(MOCK_CFG).cfg rpmcommon
 
 .PHONY: mock-rpm
 mock-rpm: /etc/mock/$(MOCK_CFG).cfg mock-srpm
-	$(MOCK_BIN) -r $(MOCK_CFG) $(MOCK_ARGS) --resultdir rpm-build/ --rebuild rpm-build/$(NAME)-*.src.rpm
+	$(MOCK_BIN) -r $(MOCK_CFG) $(MOCK_ARGS) --resultdir rpm-build/ --bootstrap-chroot --old-chroot --rebuild rpm-build/$(NAME)-*.src.rpm \
+    --define "rpmversion $(RPMVERSION)" \
+	--define "upstream_version $(VERSION)" \
+	--define "rpmrelease $(RPMRELEASE)" \
+	--define "repotag $(REPOTAG)"
 	@echo "#############################################"
 	@echo "Ansible RPM is built:"
 	@echo rpm-build/*.noarch.rpm
@@ -250,6 +275,10 @@ srpm: rpmcommon
 	--define "_srcrpmdir %{_topdir}" \
 	--define "_specdir $(RPMSPECDIR)" \
 	--define "_sourcedir %{_topdir}" \
+	--define "upstream_version $(VERSION)" \
+	--define "rpmversion $(RPMVERSION)" \
+	--define "rpmrelease $(RPMRELEASE)" \
+	--define "repotag $(REPOTAG)" \
 	-bs rpm-build/$(NAME).spec
 	@rm -f rpm-build/$(NAME).spec
 	@echo "#############################################"
@@ -265,8 +294,12 @@ rpm: rpmcommon
 	--define "_srcrpmdir %{_topdir}" \
 	--define "_specdir $(RPMSPECDIR)" \
 	--define "_sourcedir %{_topdir}" \
-	--define "_rpmfilename %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm" \
+	--define "_rpmfilename $(RPMNVR).%%{ARCH}.rpm" \
 	--define "__python `which $(PYTHON)`" \
+	--define "upstream_version $(VERSION)" \
+	--define "rpmversion $(RPMVERSION)" \
+	--define "rpmrelease $(RPMRELEASE)" \
+	--define "repotag $(REPOTAG)" \
 	-ba rpm-build/$(NAME).spec
 	@rm -f rpm-build/$(NAME).spec
 	@echo "#############################################"
@@ -280,7 +313,7 @@ debian: sdist
 	    mkdir -p deb-build/$${DIST} ; \
 	    tar -C deb-build/$${DIST} -xvf dist/$(NAME)-$(VERSION).tar.gz ; \
 	    cp -a packaging/debian deb-build/$${DIST}/$(NAME)-$(VERSION)/ ; \
-        sed -ie "s|%VERSION%|$(VERSION)|g;s|%RELEASE%|$(DEB_RELEASE)|;s|%DIST%|$${DIST}|g;s|%DATE%|$(DEB_DATE)|g" deb-build/$${DIST}/$(NAME)-$(VERSION)/debian/changelog ; \
+        sed -ie "s|%VERSION%|$(DEB_VERSION)|g;s|%RELEASE%|$(DEB_RELEASE)|;s|%DIST%|$${DIST}|g;s|%DATE%|$(DEB_DATE)|g" deb-build/$${DIST}/$(NAME)-$(VERSION)/debian/changelog ; \
 	done
 
 .PHONY: deb
@@ -289,12 +322,12 @@ deb: deb-src
 	    PBUILDER_OPTS="$(PBUILDER_OPTS) --distribution $${DIST} --basetgz $(PBUILDER_CACHE_DIR)/$${DIST}-$(PBUILDER_ARCH)-base.tgz --buildresult $(CURDIR)/deb-build/$${DIST}" ; \
 	    $(PBUILDER_BIN) create $${PBUILDER_OPTS} --othermirror "deb http://archive.ubuntu.com/ubuntu $${DIST} universe" ; \
 	    $(PBUILDER_BIN) update $${PBUILDER_OPTS} ; \
-	    $(PBUILDER_BIN) build $${PBUILDER_OPTS} deb-build/$${DIST}/$(NAME)_$(VERSION)-$(DEB_RELEASE)~$${DIST}.dsc ; \
+	    $(PBUILDER_BIN) build $${PBUILDER_OPTS} deb-build/$${DIST}/$(NAME)_$(DEB_VERSION)-$(DEB_RELEASE)~$${DIST}.dsc ; \
 	done
 	@echo "#############################################"
 	@echo "Ansible DEB artifacts:"
 	@for DIST in $(DEB_DIST) ; do \
-	    echo deb-build/$${DIST}/$(NAME)_$(VERSION)-$(DEB_RELEASE)~$${DIST}_amd64.changes ; \
+	    echo deb-build/$${DIST}/$(NAME)_$(DEB_VERSION)-$(DEB_RELEASE)~$${DIST}_amd64.changes ; \
 	done
 	@echo "#############################################"
 
@@ -308,7 +341,7 @@ local_deb: debian
 	@echo "#############################################"
 	@echo "Ansible DEB artifacts:"
 	@for DIST in $(DEB_DIST) ; do \
-	    echo deb-build/$${DIST}/$(NAME)_$(VERSION)-$(DEB_RELEASE)~$${DIST}_amd64.changes ; \
+	    echo deb-build/$${DIST}/$(NAME)_$(DEB_VERSION)-$(DEB_RELEASE)~$${DIST}_amd64.changes ; \
 	done
 	@echo "#############################################"
 

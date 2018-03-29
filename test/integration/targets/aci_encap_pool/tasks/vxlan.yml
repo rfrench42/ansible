@@ -1,5 +1,5 @@
 ---
-- name: ensure vxlan pool does not exist for tests to kick off
+- name: ensure vxlan pool anstest does not exist for tests to kick off
   aci_encap_pool: &aci_vxlan_absent
     host: "{{ aci_hostname }}"
     username: "{{ aci_username }}"
@@ -11,6 +11,16 @@
     state: absent
     pool: anstest
     pool_type: vxlan
+
+- name: ensure vxlan pool anstest_2 does not exist for tests to kick off
+  aci_encap_pool:
+    <<: *aci_vxlan_absent
+    pool: anstest_2
+
+- name: ensure vxlan pool anstest_3 does not exist for tests to kick off
+  aci_encap_pool:
+    <<: *aci_vxlan_absent
+    pool: anstest_3
 
 - name: create vxlan pool - check mode works
   aci_encap_pool: &aci_vxlan_present
@@ -73,11 +83,11 @@
     that:
       - create_vxlan_2.changed == true
 
-- name: create vxlan pool with allocation mode - failure message works
+- name: create vxlan pool with pool allocation mode - failure message works
   aci_encap_pool:
     <<: *aci_vxlan_present
     name: anstest_3
-    allocation_mode: dynamic
+    pool_allocation_mode: dynamic
   ignore_errors: yes
   register: create_vxlan_alloc_mode
 
@@ -85,7 +95,7 @@
   assert:
     that:
       - create_vxlan_alloc_mode.failed == true
-      - 'create_vxlan_alloc_mode.msg == "vxlan pools do not support setting the allocation_mode; please remove this parameter from the task"'
+      - "create_vxlan_alloc_mode.msg == 'vxlan pools do not support setting the \\'pool_allocation_mode\\'; please remove this parameter from the task'"
 
 - name: get vxlan pool - get object works
   aci_encap_pool: &aci_vxlan_query
@@ -97,7 +107,7 @@
   assert:
     that:
       - query_vxlan.changed == false
-      - query_vxlan.previous | length == 1
+      - query_vxlan.current | length == 1
       - '"infra/vxlanns-anstest.json" in query_vxlan.url'
 
 - name: get created static vlan pool - get class works
@@ -110,7 +120,7 @@
   assert:
     that:
       - query_vxlan_all.changed == false
-      - query_vxlan_all.previous | length > 1
+      - query_vxlan_all.current | length > 1
       - '"class/fvnsVxlanInstP.json" in query_vxlan_all.url'
 
 - name: delete vxlan pool - check mode works
