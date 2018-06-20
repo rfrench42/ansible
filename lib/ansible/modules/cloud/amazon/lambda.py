@@ -358,6 +358,7 @@ def main():
         vpc_security_group_ids=dict(type='list'),
         environment_variables=dict(type='dict'),
         dead_letter_arn=dict(),
+        tracing_config_mode=dict(choices=['Active', 'PassThrough']),
         tags=dict(type='dict'),
     )
 
@@ -393,6 +394,7 @@ def main():
     environment_variables = module.params.get('environment_variables')
     dead_letter_arn = module.params.get('dead_letter_arn')
     tags = module.params.get('tags')
+    tracing_config_mode = module.params.get('tracing_config_mode')
 
     check_mode = module.check_mode
     changed = False
@@ -449,6 +451,13 @@ def main():
             else:
                 if dead_letter_arn != "":
                     func_kwargs.update({'DeadLetterConfig': {'TargetArn': dead_letter_arn}})
+        if tracing_config_mode is not None:
+            if current_config.get('TracingConfig'):
+                if current_config['TracingConfig']['Mode'] != tracing_config_mode:
+                    func_kwargs.update({'TracingConfig': {'Mode': tracing_config_mode}})
+            else:
+                if tracing_config_mode != "":
+                    func_kwargs.update({'TracingConfig': {'Mode': tracing_config_mode}})
 
         # Check for unsupported mutation
         if current_config['Runtime'] != runtime:
